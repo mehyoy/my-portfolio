@@ -59,7 +59,9 @@ body.ov #pwrap{left:140px;right:96px;bottom:104px}
 #ov button:active{background:rgba(255,176,46,.85);transform:scale(.94)}
 #ov #ovc{width:68px;height:68px;font-size:28px;background:rgba(249,115,22,calc(var(--op,.45)*.95))}
 #gear,#fsb,#snb{position:absolute;right:8px;top:42px;width:36px;height:36px;padding:0;border-radius:50%;background:#0006;font-size:17px;border:1.5px solid #fff5;backdrop-filter:blur(4px)}
-#fsb{top:84px}#snb{top:126px}
+#fsb{top:84px}
+.swr{display:flex;flex-wrap:wrap;gap:8px}.sw{width:38px;height:38px;border-radius:50%;padding:0;border:2px solid #8886}.sw.on{border-color:var(--ink);box-shadow:0 0 0 3px var(--acc)}
+.bprev{height:16px;background:#0007;border-radius:9px;overflow:hidden;border:2px solid #fff6;margin-top:4px}#snb{top:126px}
 .sel{display:flex;flex-direction:column;gap:2px;text-align:left;width:100%;margin:6px 0;background:var(--bg);color:var(--ink);border:2px solid #8886;border-radius:14px;padding:12px}
 .sel.on{border-color:var(--acc);box-shadow:0 0 0 2px color-mix(in srgb,var(--acc) 35%,transparent)}
 .sheet input[type=range]{width:55%;padding:0}
@@ -394,13 +396,27 @@ function setLH(v){S.lh=v?1:0;applyCtl();save()}
 function setVol(k,v){S[k]=+v;auInit();auVol();save()}
 function setMute(v){S.mute=v?1:0;auInit();auVol();updSnd();save();const e=document.getElementById("mt");if(e)e.checked=!!S.mute}
 function setAFS(v){S.afs=v?1:0;save()}
+const BARS=[
+ {g:"Classic",n:"Classic",c:"linear-gradient(90deg,#4ade80,#facc15,#ef4444)"},
+ {g:"Solid colours",n:"Red",c:"#ef4444"},{g:"Solid colours",n:"Orange",c:"#f97316"},{g:"Solid colours",n:"Yellow",c:"#facc15"},{g:"Solid colours",n:"Green",c:"#22c55e"},
+ {g:"Solid colours",n:"Teal",c:"#14b8a6"},{g:"Solid colours",n:"Blue",c:"#3b82f6"},{g:"Solid colours",n:"Purple",c:"#a855f7"},{g:"Solid colours",n:"Pink",c:"#ec4899"},{g:"Solid colours",n:"White",c:"#ffffff"},
+ {g:"Shades",n:"Blue shades",c:"linear-gradient(90deg,#bfdbfe,#3b82f6,#1e3a8a)"},{g:"Shades",n:"Green shades",c:"linear-gradient(90deg,#bbf7d0,#22c55e,#14532d)"},
+ {g:"Shades",n:"Red shades",c:"linear-gradient(90deg,#fecaca,#ef4444,#7f1d1d)"},{g:"Shades",n:"Purple shades",c:"linear-gradient(90deg,#e9d5ff,#a855f7,#581c87)"},
+ {g:"Shades",n:"Pink shades",c:"linear-gradient(90deg,#fbcfe8,#ec4899,#831843)"},{g:"Shades",n:"Orange shades",c:"linear-gradient(90deg,#fed7aa,#f97316,#7c2d12)"},
+ {g:"Shades",n:"Teal shades",c:"linear-gradient(90deg,#99f6e4,#14b8a6,#134e4a)"},{g:"Shades",n:"Grey shades",c:"linear-gradient(90deg,#f1f5f9,#94a3b8,#1e293b)"}];
+function applyBar(){const b=BARS[S.bar]||BARS[0];$("pw").style.background=b.c}
+function setBar(i){S.bar=i;applyBar();save();document.querySelectorAll(".sw").forEach((e,j)=>e.classList.toggle("on",j===i));prevBar()}
+function prevBar(){const e=document.getElementById("bpv");if(e)e.style.background=(BARS[S.bar]||BARS[0]).c}
+function barHTML(){let g="",h="";BARS.forEach((b,i)=>{if(b.g!==g){if(g)h+="</div>";g=b.g;h+=`<div class="mut" style="margin:8px 0 4px">${b.g}</div><div class="swr">`}
+ h+=`<button class="sw${(S.bar||0)===i?" on":""}" style="background:${b.c}" title="${b.n}" aria-label="${b.n}" onclick="setBar(${i})"></button>`});
+ return h+`</div><div class="mut" style="margin-top:8px">Preview</div><div class="bprev"><div id="bpv" style="width:70%;height:100%"></div></div>`}
 function settings(){if(introOn)return;keys.l=keys.r=0;
- openM(`<h2>⚙️ Settings <button class="sec" onclick="closeM()">✕</button></h2><b>🔊 Sound</b><div class="it"><span>Mute everything (M)</span><input id="mt" type="checkbox" ${S.mute?"checked":""} onchange="setMute(this.checked)"></div><div class="it"><span>Master volume</span><input type="range" min="0" max="100" value="${S.mv}" oninput="setVol('mv',this.value)"></div><div class="it"><span>Music volume</span><input type="range" min="0" max="100" value="${S.mu}" oninput="setVol('mu',this.value)"></div><div class="it"><span>Sound effects volume</span><input type="range" min="0" max="100" value="${S.sx}" oninput="setVol('sx',this.value);sfxSplash()"></div><div class="it"><span>🎵 Now playing: <b id="np">${AU.timer?TR[AU.ti].n:"—"}</b></span><button class="sec" onclick="nextTrack()">Next ▶</button></div><br><b>🖥️ Display</b><div class="it"><span>Fullscreen (F)</span><button class="sec" onclick="toggleFS()">Toggle</button></div><div class="it"><span>Go fullscreen when I press Start</span><input type="checkbox" ${S.afs?"checked":""} onchange="setAFS(this.checked)"></div><br><b>Touch controls</b>
+ openM(`<h2>⚙️ Settings <button class="sec" onclick="closeM()">✕</button></h2><b>🔊 Sound</b><div class="it"><span>Mute everything (M)</span><input id="mt" type="checkbox" ${S.mute?"checked":""} onchange="setMute(this.checked)"></div><div class="it"><span>Master volume</span><input type="range" min="0" max="100" value="${S.mv}" oninput="setVol('mv',this.value)"></div><div class="it"><span>Music volume</span><input type="range" min="0" max="100" value="${S.mu}" oninput="setVol('mu',this.value)"></div><div class="it"><span>Sound effects volume</span><input type="range" min="0" max="100" value="${S.sx}" oninput="setVol('sx',this.value);sfxSplash()"></div><div class="it"><span>🎵 Now playing: <b id="np">${AU.timer?TR[AU.ti].n:"—"}</b></span><button class="sec" onclick="nextTrack()">Next ▶</button></div><br><b>🖥️ Display</b><div class="it"><span>Fullscreen (F)</span><button class="sec" onclick="toggleFS()">Toggle</button></div><div class="it"><span>Go fullscreen when I press Start</span><input type="checkbox" ${S.afs?"checked":""} onchange="setAFS(this.checked)"></div><br><b>🎯 Casting bar colour</b>${barHTML()}<br><b>Touch controls</b>
  <button class="sel ${S.ctl==="overlay"?"on":""}" onclick="setCtl('overlay')"><b>Overlay</b><span class="mut">Small see-through round buttons right on the screen</span></button>
  <button class="sel ${S.ctl==="classic"?"on":""}" onclick="setCtl('classic')"><b>Classic</b><span class="mut">Buttons in a row under the screen (the original layout)</span></button>
  <div class="it"><span>Button opacity (left = see-through)</span><input type="range" min="15" max="90" value="${S.op}" oninput="setOp(this.value)"></div>
  <div class="it"><span>Left-handed layout (swap sides)</span><input type="checkbox" ${S.lh?"checked":""} onchange="setLH(this.checked)"></div>
- <p class="mut">Keyboard: ← → or A D walk · Space cast · E interact · 1–9 hotbar</p>`)}
+ <p class="mut">Keyboard: ← → or A D walk · Space cast · E interact · 1–9 hotbar</p>`);prevBar()}
 /* ---------- questions ---------- */
 const zn=s=>String(s).toLowerCase().replace(/<[^>]+>/g,"").replace(/[^a-z0-9]+/g," ").trim();
 function lev(a,b){const d=[...Array(b.length+1).keys()];for(let i=1;i<=a.length;i++){let p=d[0];d[0]=i;for(let j=1;j<=b.length;j++){const t=d[j];d[j]=Math.min(d[j]+1,d[j-1]+1,p+(a[i-1]===b[j-1]?0:1));p=t}}return d[b.length]}
@@ -605,6 +621,6 @@ function playerDraw(sw,bob){
  cx.restore();cx.lineCap="butt";
 }
 
-renderUnits();renderHot();applyCtl();updSnd();rs();requestAnimationFrame(loop);
+renderUnits();renderHot();applyCtl();applyBar();updSnd();rs();requestAnimationFrame(loop);
 </script>
 <script>try{if("serviceWorker"in navigator&&/^https?:/.test(location.protocol))navigator.serviceWorker.register("sw.js")}catch(e){}</script></body></html>
