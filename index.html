@@ -1246,7 +1246,7 @@ ${RULES}`;
     const GROQ_TEXT = "llama-3.3-70b-versatile", GROQ_VISION = "meta-llama/llama-4-scout-17b-16e-instruct";
     const AI = {key() {try {const k = localStorage.getItem("planner-akey") || ""; return /^gsk_/.test(k) ? k : ""} catch (e) {return ""} }, model() {try {const m = localStorage.getItem("planner-amodel") || ""; return m && !/^claude/i.test(m) ? m : GROQ_TEXT} catch (e) {return GROQ_TEXT} } };
     // Paste your Cloudflare Worker URL here (see README.txt). Leave "" to make everyone use their own key.
-    const PROXY_URL = "studentplanner.pages.dev";
+    const PROXY_URL = "https://1825f49e.studentplanner.pages.dev";
     const aiReady = () => !!(SAMPLE || AI.key() || PROXY_URL);
     const b64 = f => new Promise((res, rej) => {const r = new FileReader(); r.onload = () => res(r.result.split(",")[1]); r.onerror = () => rej(new Error("Couldn’t read that image.")); r.readAsDataURL(f)});
     async function aiAsk(prompt, o) {
@@ -1257,7 +1257,7 @@ ${RULES}`;
       if (o.images && o.images.length) {const f = o.images[0]; if (!/^image\/(jpeg|png|webp|gif)$/.test(f.type)) throw new Error("Use a JPEG or PNG screenshot."); content = [{type: "image_url", image_url: {url: "data:" + f.type + ";base64," + await b64(f)}}, {type: "text", text: prompt}]}
       const r = await fetch(k ? "https://api.groq.com/openai/v1/chat/completions" : PROXY_URL, {
         method: "POST", headers: k ? {"content-type": "application/json", "Authorization": "Bearer " + k} : {"content-type": "application/json"},
-        body: JSON.stringify({model: (o.images && o.images.length) ? GROQ_VISION : AI.model(), max_tokens: o.max || 8000, stream: true, messages: [{role: "system", content: "You are a careful planning assistant. Never invent commitments the user did not mention. When asked for JSON, reply with only valid JSON."}, {role: "user", content}]})
+        body: JSON.stringify({model: (o.images && o.images.length) ? GROQ_VISION : AI.model(), max_tokens: Math.min(o.max || 8000, 14000), stream: true, messages: [{role: "system", content: "You are a careful planning assistant. Never invent commitments the user did not mention. When asked for JSON, reply with only valid JSON."}, {role: "user", content}]})
       });
       if (!r.ok) {let m = ""; try {m = (await r.json()).error.message} catch (e) { } throw new Error(r.status === 401 ? "That API key was rejected. Check it in Settings." : r.status === 403 ? "The AI service refused this site. Check ALLOWED_ORIGIN on the worker." : r.status === 429 ? "Groq rate limit reached. Wait a moment and try again." : "The AI said: " + (m || r.status))}
       const rd = r.body.getReader(), dec = new TextDecoder(); let buf = "", text = "";
