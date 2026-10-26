@@ -176,7 +176,7 @@ function vTheme(){
   bindSettings();document.querySelectorAll("[data-th]").forEach(b=>b.onclick=()=>{theme=b.dataset.th;try{localStorage.setItem("planner-theme",theme)}catch(e){}applyTheme(theme);render()});
 }
 
-const st=()=>Object.assign({cap:10,rest:-1,rev:true},S.settings||{});
+const st=()=>Object.assign({cap:10,rest:-1,rev:true,nlead:5,nbrief:"07:30",nwrap:"",nact:true,nexam:true},S.settings||{});
 const fixedMin=d=>on(d).filter(t=>t.fixed).reduce((a,t)=>a+t.estimateMin,0);
 const avail=(d,lost=0)=>D(d).getDay()===st().rest?0:Math.max(0,st().cap*60-fixedMin(d)-lost);
 const usedMin=d=>S.tasks.filter(t=>t.date===d&&!t.fixed).reduce((a,t)=>a+t.estimateMin,0);
@@ -217,22 +217,44 @@ function paceHTML(){
   let n=0;for(let i=1;i<30;i++){if(S.tasks.some(t=>t.done&&!t.fixed&&t.date===add(TODAY,-i)))n++;else break}
   if(n>=6)o+=`<div class="pan"><b>${n} days in a row.</b><p class="small mute" style="margin:0">Strong consistency. Schedule a lighter day soon so you don’t burn out.</p></div>`;
   return o}
-function settingsHTML(){const x=st();return`<h1 style="margin-bottom:10px">Settings</h1><div class="pan"><label for="sc">Hours I can work per day (lectures plus study)</label><select id="sc">${[6,7,8,9,10,11,12,13,14].map(h=>`<option value="${h}" ${x.cap===h?"selected":""}>${h} hours</option>`).join("")}</select><label for="sr">Day off (re-planning won’t schedule work)</label><select id="sr"><option value="-1" ${x.rest===-1?"selected":""}>None</option>${["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"].map((n,i)=>`<option value="${i}" ${x.rest===i?"selected":""}>${n}</option>`).join("")}</select><label><input type="checkbox" id="sv2" ${x.rev?"checked":""} style="width:auto;margin-right:8px">Bring weak topics back for review automatically</label></div><div class="pan"><b>Sync</b><p class="small mute" style="margin:4px 0 0">${esc(cloudMsg)}</p></div><div class="pan"><b>Calendar and reminders</b><p class="small mute">Export timed tasks, fixed commitments, and exam dates to your phone’s calendar. Timed tasks get an alert 10 minutes before. This is a snapshot, so export again after big changes.</p><button class="btn" id="ics">Export calendar file</button><div id="icsm" class="small" style="margin-top:8px"></div></div>${gcHTML()}`}
+function settingsHTML(){const x=st();return`<h1 style="margin-bottom:10px">Settings</h1><div class="pan"><label for="sc">Hours I can work per day (lectures plus study)</label><select id="sc">${[6,7,8,9,10,11,12,13,14].map(h=>`<option value="${h}" ${x.cap===h?"selected":""}>${h} hours</option>`).join("")}</select><label for="sr">Day off (re-planning won’t schedule work)</label><select id="sr"><option value="-1" ${x.rest===-1?"selected":""}>None</option>${["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"].map((n,i)=>`<option value="${i}" ${x.rest===i?"selected":""}>${n}</option>`).join("")}</select><label><input type="checkbox" id="sv2" ${x.rev?"checked":""} style="width:auto;margin-right:8px">Bring weak topics back for review automatically</label></div>${remHTML()}<div class="pan"><b>Sync</b><p class="small mute" style="margin:4px 0 0">${esc(cloudMsg)}</p></div><div class="pan"><b>Calendar and reminders</b><p class="small mute">Export timed tasks, fixed commitments, and exam dates to your phone’s calendar. Timed tasks get an alert 10 minutes before. This is a snapshot, so export again after big changes.</p><button class="btn" id="ics">Export calendar file</button><div id="icsm" class="small" style="margin-top:8px"></div></div>${gcHTML()}`}
 function bindSettings(){
   bindGC();
   const set=(k,v)=>{S.settings=Object.assign(st(),{[k]:v});save()};
-  $("#sc").onchange=e=>set("cap",+e.target.value);$("#sr").onchange=e=>set("rest",+e.target.value);$("#sv2").onchange=e=>set("rev",e.target.checked);
+  $("#sc").onchange=e=>set("cap",+e.target.value);$("#sr").onchange=e=>set("rest",+e.target.value);$("#sv2").onchange=e=>set("rev",e.target.checked);$("#nl").onchange=e=>set("nlead",+e.target.value);$("#nb").onchange=e=>set("nbrief",e.target.value);$("#nw").onchange=e=>set("nwrap",e.target.value);$("#na").onchange=e=>set("nact",e.target.checked);$("#ne").onchange=e=>set("nexam",e.target.checked);
   $("#ics").onclick=async()=>{const m=$("#icsm");try{let d=null;try{d=window.claude&&claude.use?await claude.use("downloads"):null}catch(e){}if(d)await d.save({filename:"planner.ics",data:ics()});else{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([ics()],{type:"text/calendar"}));a.download="planner.ics";document.body.appendChild(a);a.click();a.remove()}m.textContent="Saved. Open the file to add it to your calendar."}catch(e){m.textContent="The file wasn’t saved. "+(e&&e.message?e.message:"")}}
 }
+const evId=s=>"p"+Array.from(s).map(c=>c.charCodeAt(0).toString(16).padStart(2,"0")).join("");
+function alertEvents(hor){
+  const s=st(),out=[],mk=(d,hm,m)=>{const[y,mo,da]=d.split("-").map(Number),[h,mi]=hm.split(":").map(Number);return[new Date(y,mo-1,da,h,mi),new Date(y,mo-1,da,h,mi+m)]};
+  const ttl=t=>{let x=t.title;if(s.nact&&t.firstStep&&!t.fixed)x+=" — "+t.firstStep;return x.length>110?x.slice(0,107)+"…":x};
+  S.tasks.filter(t=>t.date&&t.start&&!t.done&&!t.src&&t.date>=TODAY&&t.date<=hor).forEach(t=>{const[a,b]=mk(t.date,t.start,t.estimateMin||30);
+    out.push({id:evId(t.id),summary:ttl(t),description:[t.estimateMin&&"About "+t.estimateMin+" minutes",t.firstStep&&"Start with: "+t.firstStep,t.doneWhen&&"Done when: "+t.doneWhen,t.location&&"Where: "+t.location].filter(Boolean).join("\n"),a,b,alarms:t.fixed?[]:[s.nlead]})});
+  const top=d=>S.tasks.filter(t=>t.date===d&&!t.fixed&&!t.done).sort((x,y)=>pri(y)-pri(x)||y.estimateMin-x.estimateMin||(x.start||"99").localeCompare(y.start||"99"));
+  const line=(t,i)=>(i+1)+". "+t.title+(t.start?" at "+t.start:"")+(t.firstStep?" — start with: "+t.firstStep:"");
+  for(let k=0;k<14;k++){const d=add(TODAY,k);if(s.rest===D(d).getDay())continue;const T=top(d);
+    if(s.nbrief&&T.length){const ex=S.milestones.filter(m=>m.date>=d).sort((x,y)=>x.date.localeCompare(y.date))[0],[a,b]=mk(d,s.nbrief,15);
+      out.push({id:evId("brief"+d),summary:("Today’s priorities: "+T.slice(0,3).map(t=>t.title).join(" · ")).slice(0,110),description:T.slice(0,3).map(line).join("\n")+(T.length>3?"\n+"+(T.length-3)+" smaller tasks":"")+(ex?"\n\n"+ex.title+" is in "+Math.round((D(ex.date)-D(d))/864e5)+" days":""),a,b,alarms:[0]})}
+    const nd=add(d,1),N=s.rest===D(nd).getDay()?[]:top(nd);
+    if(s.nwrap&&N.length){const f=N.slice().sort((x,y)=>(x.start||"99").localeCompare(y.start||"99"))[0],[a,b]=mk(d,s.nwrap,15);
+      out.push({id:evId("wrap"+d),summary:("Tomorrow starts with: "+f.title+(f.start?" at "+f.start:"")).slice(0,110),description:N.slice(0,3).map(line).join("\n")+(f.materials.length?"\n\nSet out tonight: "+f.materials.join(", "):""),a,b,alarms:[0]})}}
+  S.milestones.filter(m=>!m.src&&m.date>=TODAY&&m.date<=hor).forEach((m,i)=>{const[y,mo,da]=m.date.split("-").map(Number);
+    out.push({id:evId("ms"+m.date+i),summary:m.title,description:"",allDay:true,date:m.date,b:new Date(y,mo-1,da+1),alarms:s.nexam?[9540,3780,900]:[900]})});
+  return out}
 function ics(){
-  const p=n=>String(n).padStart(2,"0"),q=s=>String(s).replace(/[\\;,]/g,m=>"\\"+m).replace(/\n/g," "),f=d=>d.getFullYear()+p(d.getMonth()+1)+p(d.getDate()),stamp=new Date().toISOString().replace(/[-:]|\.\d+/g,"");
+  const p=n=>String(n).padStart(2,"0"),q=x=>String(x).replace(/[\\;,]/g,m=>"\\"+m).replace(/\n/g,"\\n"),f=d=>d.getFullYear()+p(d.getMonth()+1)+p(d.getDate()),ft=d=>f(d)+"T"+p(d.getHours())+p(d.getMinutes())+"00",stamp=new Date().toISOString().replace(/[-:]|\.\d+/g,"");
   const L=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Planner//EN"];
-  S.tasks.filter(t=>t.date&&t.start&&!t.done).forEach(t=>{const[y,mo,da]=t.date.split("-").map(Number),[h,mi]=t.start.split(":").map(Number),a=new Date(y,mo-1,da,h,mi),b=new Date(y,mo-1,da,h,mi+(t.estimateMin||30));
-    L.push("BEGIN:VEVENT","UID:"+t.id+"@planner","DTSTAMP:"+stamp,"DTSTART:"+f(a)+"T"+p(h)+p(mi)+"00","DTEND:"+f(b)+"T"+p(b.getHours())+p(b.getMinutes())+"00","SUMMARY:"+q(t.title));
-    if(t.firstStep)L.push("DESCRIPTION:Start with: "+q(t.firstStep));
-    if(!t.fixed)L.push("BEGIN:VALARM","TRIGGER:-PT10M","ACTION:DISPLAY","DESCRIPTION:Starting soon","END:VALARM");L.push("END:VEVENT")});
-  S.milestones.filter(m=>m.date>=TODAY).forEach((m,i)=>{const[y,mo,da]=m.date.split("-").map(Number);L.push("BEGIN:VEVENT","UID:ms"+i+m.date+"@planner","DTSTAMP:"+stamp,"DTSTART;VALUE=DATE:"+f(new Date(y,mo-1,da)),"DTEND;VALUE=DATE:"+f(new Date(y,mo-1,da+1)),"SUMMARY:"+q(m.title),"BEGIN:VALARM","TRIGGER:-P1D","ACTION:DISPLAY","DESCRIPTION:Tomorrow","END:VALARM","END:VEVENT")});
+  alertEvents(add(TODAY,90)).forEach(e=>{L.push("BEGIN:VEVENT","UID:"+e.id+"@planner","DTSTAMP:"+stamp,e.allDay?"DTSTART;VALUE=DATE:"+e.date.replace(/-/g,""):"DTSTART:"+ft(e.a),e.allDay?"DTEND;VALUE=DATE:"+f(e.b):"DTEND:"+ft(e.b),"SUMMARY:"+q(e.summary));
+    if(e.description)L.push("DESCRIPTION:"+q(e.description));
+    e.alarms.forEach(m=>L.push("BEGIN:VALARM","TRIGGER:"+(m?"-":"")+"PT"+m+"M","ACTION:DISPLAY","DESCRIPTION:"+q(e.summary),"END:VALARM"));L.push("END:VEVENT")});
   L.push("END:VCALENDAR");return L.join("\r\n")}
+function remHTML(){const x=st(),o=(a,v)=>a.map(([k,l])=>`<option value="${k}" ${String(v)===String(k)?"selected":""}>${l}</option>`).join("");
+  return`<div class="pan"><b>Reminders</b><p class="small mute" style="margin:4px 0 10px">Reminders come from your calendar, so they arrive even when this app is closed. Turn them on with Google Calendar sync or the calendar export below, and sync again after you change these. I keep them few and specific.</p>
+  <label for="nl">Task reminder</label><select id="nl">${o([[0,"At the start time"],[5,"5 minutes before"],[10,"10 minutes before"],[15,"15 minutes before"],[30,"30 minutes before"]],x.nlead)}</select>
+  <label for="nb">Morning briefing: your top 3 for the day</label><select id="nb">${o([["","Off"],["06:30","6:30 am"],["07:00","7:00 am"],["07:30","7:30 am"],["08:00","8:00 am"],["09:00","9:00 am"]],x.nbrief)}</select>
+  <label for="nw">Evening look-ahead: what tomorrow starts with</label><select id="nw">${o([["","Off"],["18:00","6:00 pm"],["19:00","7:00 pm"],["20:00","8:00 pm"],["21:00","9:00 pm"]],x.nwrap)}</select>
+  <label style="display:block;margin-bottom:8px"><input type="checkbox" id="na" ${x.nact?"checked":""} style="width:auto;margin-right:8px">Put the first step in each task reminder</label>
+  <label style="display:block"><input type="checkbox" id="ne" ${x.nexam?"checked":""} style="width:auto;margin-right:8px">Count down to exams and deadlines (7, 3, and 1 day before)</label></div>`}
 let cloud=null,cloudMsg="Sync isn’t available here, so your plan stays on this device only. Use Export on the Import tab to back it up.",pushT;
 function push(){if(!cloud)return;clearTimeout(pushT);pushT=setTimeout(async()=>{try{await cloud.set({json:JSON.stringify(S),upd:S.upd||0})}catch(e){cloudMsg="Sync paused (offline or the plan is too large). Your plan is saved on this device."}},1500)}
 (async()=>{try{if(!(window.claude&&claude.use))return;const[db,user]=await Promise.all([claude.use("db"),claude.use("user")]);if(!db||!user)return;const id=await user.id();if(!id)return;
@@ -283,10 +305,7 @@ async function gcPull(){
 async function gcPush(){
   const cal=await plannerCal(),tz=gcTZ(),p=n=>String(n).padStart(2,"0"),ymd=d=>d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate()),ldt=d=>ymd(d)+"T"+p(d.getHours())+":"+p(d.getMinutes())+":00";
   const eid=s=>"p"+Array.from(s).map(c=>c.charCodeAt(0).toString(16).padStart(2,"0")).join(""),hor=add(TODAY,90),want=new Map(),base="/calendars/"+encodeURIComponent(cal)+"/events";
-  S.tasks.filter(t=>t.date&&t.start&&!t.done&&!t.src&&t.date>=TODAY&&t.date<=hor).forEach(t=>{const[y,mo,da]=t.date.split("-").map(Number),[h,mi]=t.start.split(":").map(Number),a=new Date(y,mo-1,da,h,mi),b=new Date(y,mo-1,da,h,mi+(t.estimateMin||30));
-    want.set(eid(t.id),{id:eid(t.id),summary:t.title,description:[t.firstStep&&"Start with: "+t.firstStep,t.doneWhen&&"Done when: "+t.doneWhen,t.location&&"Where: "+t.location].filter(Boolean).join("\n"),start:{dateTime:ldt(a),timeZone:tz},end:{dateTime:ldt(b),timeZone:tz},reminders:{useDefault:false,overrides:t.fixed?[]:[{method:"popup",minutes:10}]}})});
-  S.milestones.filter(m=>!m.src&&m.date>=TODAY&&m.date<=hor).forEach((m,i)=>{const[y,mo,da]=m.date.split("-").map(Number),k=eid("ms"+m.date+i);
-    want.set(k,{id:k,summary:m.title,start:{date:m.date},end:{date:ymd(new Date(y,mo-1,da+1))},reminders:{useDefault:false,overrides:[{method:"popup",minutes:900}]}})});
+  alertEvents(hor).forEach(e=>want.set(e.id,{id:e.id,summary:e.summary,description:e.description,start:e.allDay?{date:e.date}:{dateTime:ldt(e.a),timeZone:tz},end:e.allDay?{date:ymd(e.b)}:{dateTime:ldt(e.b),timeZone:tz},reminders:{useDefault:false,overrides:e.alarms.map(m=>({method:"popup",minutes:m}))}}));
   const q=new URLSearchParams({timeMin:new Date(Date.now()-864e5).toISOString(),timeMax:new Date(Date.now()+95*864e5).toISOString(),singleEvents:"true",maxResults:"2500",showDeleted:"true"});
   const have=new Map(((await gapi(base+"?"+q)).items||[]).map(e=>[e.id,e])),cut=x=>(x||"").slice(0,16),jobs=[];let a1=0,u1=0,d1=0;
   const put=(id,w)=>gapi(base+"/"+id,{method:"PUT",body:JSON.stringify(Object.assign({status:"confirmed"},w))});
