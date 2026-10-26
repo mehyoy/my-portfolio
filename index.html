@@ -1243,8 +1243,8 @@ ${RULES}`;
     }
     function formGet() {try {return JSON.parse(localStorage.getItem("planner-form") || "{}")} catch (e) {return {}} }
     function formInfo() {const f = formGet(), v = k => (f[k] || "").trim() || "(none)"; return `- Goals and deadlines: ${v("g")}\n- How far ahead to plan: ${v("h")}\n- Fixed commitments (lectures, labs, shifts, with days and times): ${v("x")}\n- When I am free to study: ${v("fr")}\n- Other things I need to get done (errands, chores, habits): ${v("o")}\n- Most hours I can work in a day, lectures included: ${st().cap}`}
-    const GROQ_TEXT = "llama-3.3-70b-versatile", GROQ_VISION = "meta-llama/llama-4-scout-17b-16e-instruct";
-    const AI = {key() {try {const k = localStorage.getItem("planner-akey") || ""; return /^gsk_/.test(k) ? k : ""} catch (e) {return ""} }, model() {try {const m = localStorage.getItem("planner-amodel") || ""; return m && !/^claude/i.test(m) ? m : GROQ_TEXT} catch (e) {return GROQ_TEXT} } };
+    const GROQ_TEXT = "openai/gpt-oss-120b", GROQ_VISION = "qwen/qwen3.6-27b";
+    const AI = {key() {try {const k = localStorage.getItem("planner-akey") || ""; return /^gsk_/.test(k) ? k : ""} catch (e) {return ""} }, model() {try {const m = localStorage.getItem("planner-amodel") || ""; return m && !/^(claude|llama|meta-llama)/i.test(m) ? m : GROQ_TEXT} catch (e) {return GROQ_TEXT} } };
     // Paste your Cloudflare Worker URL here (see README.txt). Leave "" to make everyone use their own key.
     const PROXY_URL = "https://planner-ai.mehyoy4.workers.dev";
     const aiReady = () => !!(SAMPLE || AI.key() || PROXY_URL);
@@ -1257,7 +1257,7 @@ ${RULES}`;
       if (o.images && o.images.length) {const f = o.images[0]; if (!/^image\/(jpeg|png|webp|gif)$/.test(f.type)) throw new Error("Use a JPEG or PNG screenshot."); content = [{type: "image_url", image_url: {url: "data:" + f.type + ";base64," + await b64(f)}}, {type: "text", text: prompt}]}
       const r = await fetch(k ? "https://api.groq.com/openai/v1/chat/completions" : PROXY_URL, {
         method: "POST", headers: k ? {"content-type": "application/json", "Authorization": "Bearer " + k} : {"content-type": "application/json"},
-        body: JSON.stringify({model: (o.images && o.images.length) ? GROQ_VISION : AI.model(), max_tokens: Math.min(o.max || 8000, 14000), stream: true, messages: [{role: "system", content: "You are a careful planning assistant. Never invent commitments the user did not mention. When asked for JSON, reply with only valid JSON."}, {role: "user", content}]})
+        body: JSON.stringify(Object.assign({model: (o.images && o.images.length) ? GROQ_VISION : AI.model(), max_tokens: Math.min(o.max || 8000, 14000), stream: true}, /^openai\/gpt-oss/.test((o.images && o.images.length) ? GROQ_VISION : AI.model()) ? {reasoning_effort: "low"} : {}, {messages: [{role: "system", content: "You are a careful planning assistant. Never invent commitments the user did not mention. When asked for JSON, reply with only valid JSON."}, {role: "user", content}]}))
       });
       if (!r.ok) {let m = ""; try {m = (await r.json()).error.message} catch (e) { } throw new Error(r.status === 401 ? "That API key was rejected. Check it in Settings." : r.status === 403 ? "The AI service refused this site. Check ALLOWED_ORIGIN on the worker." : r.status === 429 ? "Groq rate limit reached. Wait a moment and try again." : "The AI said: " + (m || r.status))}
       const rd = r.body.getReader(), dec = new TextDecoder(); let buf = "", text = "";
@@ -1268,7 +1268,7 @@ ${RULES}`;
           if (j.error) throw new Error(j.error.message || "The AI stopped early."); const t = j.choices && j.choices[0] && j.choices[0].delta && j.choices[0].delta.content; if (t) {text += t; if (o.onProgress) o.onProgress(text.length)}
         }
       }
-      if (!text.trim()) throw new Error("The AI sent back nothing. Try again."); return text
+      text = text.replace(/<think>[\s\S]*?<\/think>/g, ""); if (!text.trim()) throw new Error("The AI sent back nothing. Try again."); return text
     }
     function aiSetHTML() {const k = AI.key(); return `<div class="pan"><b>AI</b><p class="small mute" style="margin:4px 0 8px">${k ? "AI is on. Your key is saved only on this device." : "Paste a Groq API key to build and update plans with AI. It’s saved only on this device. Get one free at console.groq.com/keys."}</p><label for="sk">API key</label><input id="sk" type="password" autocomplete="off" placeholder="${k ? "Saved: " + k.slice(0, 7) + "…" + k.slice(-4) : "gsk_…"}"><label for="sm">Model</label><input id="sm" value="${esc(AI.model())}" autocomplete="off"><div class="row"><button class="btn g s" id="sks">Save</button><button class="btn g s" id="skt">Test</button>${k ? `<button class="btn d s" id="skr">Remove key</button>` : ""}</div><div id="skm" class="small" style="margin-top:8px"></div></div>`}
     function bindAISet() {
