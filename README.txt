@@ -10,7 +10,7 @@ Your data is stored in the browser on that device. Use Export on the Import tab 
 
 Google Calendar: open Settings in the app and follow "How to get a Client ID". You paste the ID once; it stays on that device.
 
-AI: open Settings > AI and paste your Groq API key (starts with gsk_; get one at console.groq.com/keys). It is stored only in that device's browser, never in the site files. Text uses llama-3.3-70b-versatile (changeable in Settings); screenshots use meta-llama/llama-4-scout-17b-16e-instruct. Without a key, the copy-and-paste option still works.
+AI: open Settings > AI and paste your Groq API key (starts with gsk_; get one at console.groq.com/keys). It is stored only in that device's browser, never in the site files. Text uses openai/gpt-oss-120b (changeable in Settings); screenshots use qwen/qwen3.6-27b. Without a key, the copy-and-paste option still works.
 
 
 SHARED AI KEY (GitHub Pages: everyone uses your Groq key, nobody sees it)
