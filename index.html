@@ -1246,7 +1246,7 @@ ${RULES}`;
     const GROQ_TEXT = "llama-3.3-70b-versatile", GROQ_VISION = "meta-llama/llama-4-scout-17b-16e-instruct";
     const AI = {key() {try {const k = localStorage.getItem("planner-akey") || ""; return /^gsk_/.test(k) ? k : ""} catch (e) {return ""} }, model() {try {const m = localStorage.getItem("planner-amodel") || ""; return m && !/^claude/i.test(m) ? m : GROQ_TEXT} catch (e) {return GROQ_TEXT} } };
     // Paste your Cloudflare Worker URL here (see README.txt). Leave "" to make everyone use their own key.
-    const PROXY_URL = "https://1825f49e.studentplanner.pages.dev";
+    const PROXY_URL = "planner-ai.mehyoy4.workers.dev";
     const aiReady = () => !!(SAMPLE || AI.key() || PROXY_URL);
     const b64 = f => new Promise((res, rej) => {const r = new FileReader(); r.onload = () => res(r.result.split(",")[1]); r.onerror = () => rej(new Error("Couldn’t read that image.")); r.readAsDataURL(f)});
     async function aiAsk(prompt, o) {
