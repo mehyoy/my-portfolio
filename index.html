@@ -69,7 +69,7 @@ label{font-weight:600;font-size:.9rem}textarea.code{font:13px/1.4 ui-monospace,M
 .hb{height:10px;background:var(--line);border-radius:6px;overflow:hidden;margin:4px 0 12px}.hb i{display:block;height:100%;background:var(--c);border-radius:6px}
 .big{font:800 2rem "Familjen Grotesk",sans-serif;line-height:1}
 .err{color:var(--bad);font-weight:600;white-space:pre-wrap}.okmsg{color:var(--ok);font-weight:600}
-.ov{position:fixed;inset:0;background:var(--bg);overflow:auto;padding:calc(18px + env(safe-area-inset-top,0px)) 16px calc(40px + env(safe-area-inset-bottom,0px));z-index:9}.ov>div{max-width:560px;margin:0 auto}.hidden{display:none}
+.ov{position:fixed;inset:0;background:var(--bg);overflow:auto;padding:calc(18px + env(safe-area-inset-top,0px)) 16px calc(40px + env(safe-area-inset-bottom,0px));z-index:9}.ov>div{max-width:560px;margin:0 auto}.hidden{display:none}.rv{display:flex;gap:10px;align-items:flex-start;padding:6px 0;font-weight:400;font-size:1rem}.rv input{width:20px;height:20px;margin:2px 0 0;flex:none}
 .tmr{display:block;margin:18px auto;width:min(280px,78vw)}.tmr text{font:800 52px "Familjen Grotesk",sans-serif;fill:var(--ink)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -93,21 +93,23 @@ const fmt=(s,o)=>D(s).toLocaleDateString(undefined,o);
 const SHAPE=`{
   "title": "Plan name",
   "assumptions": ["anything you had to assume"],
-  "milestones": [{ "title": "Biology midterm", "date": "YYYY-MM-DD", "type": "exam" }],
+  "milestones": [{ "title": "Biology midterm", "date": "YYYY-MM-DD", "type": "exam", "basis": "stated" }],
   "weeks": [{ "start": "YYYY-MM-DD (a Monday)", "focus": "One-line theme for that week" }],
-  "routines": [{ "title": "Review flashcards", "days": ["mon","wed","fri"], "start": "HH:MM", "estimateMin": 20, "from": "YYYY-MM-DD", "to": "YYYY-MM-DD", "fixed": false }],
+  "routines": [{ "title": "Review flashcards", "days": ["mon","wed","fri"], "start": "HH:MM", "estimateMin": 20, "from": "YYYY-MM-DD", "to": "YYYY-MM-DD", "fixed": false, "basis": "stated" }],
   "tasks": [{
     "title": "Specific action", "date": "YYYY-MM-DD", "start": "HH:MM", "estimateMin": 30, "group": "Course",
     "doneWhen": "Observable finish line", "firstStep": "Physical action under 2 min",
-    "location": "", "materials": [], "ifThen": { "if": "obstacle", "then": "plan" }, "notes": "", "target": 0, "unit": "", "fixed": false
+    "location": "", "materials": [], "ifThen": { "if": "obstacle", "then": "plan" }, "notes": "", "target": 0, "unit": "", "fixed": false, "basis": "stated"
   }]
 }`;
 const RULES=`Rules:
+- NEVER INVENT. Use only the commitments, classes, meetings, shifts, deadlines, and events that I list. Do not make up appointments, social plans, errands, meals, workouts, or chores I did not mention. If something important is missing, say so in "assumptions" instead of guessing.
+- Tag every task, routine, and milestone with "basis": "stated" (needed for something I told you) or "suggested" (your own idea that I did not mention). Fixed commitments and milestones must always be "stated".
 - Today is ${TODAY}. Never schedule anything before today.
 - Plan at three levels: "milestones" (exams, deadlines), "weeks" (one-line focus per week), and "tasks" (daily work).
 - Write task-level detail only for the next 14 days. Beyond that, give only milestones, weekly focus and "routines". I will ask you to detail later weeks as they get closer.
-- MANY SMALL TASKS: plan 6 to 10 tasks per day. Mix a few focus blocks (20 to 45 min) with lots of tiny tasks (2 to 15 min), such as emailing a teacher, printing notes, packing my bag, booking a room, reviewing 5 flashcards, laundry, or a quick tidy. Break every big task into steps so nothing is longer than 45 minutes.
-- Include general life and admin tasks, not just studying: errands, chores, meals, exercise, sleep, social plans, small admin. Use group "General" for those.
+- MANY SMALL TASKS: plan up to 6 to 10 tasks per day, only as many as my goals really need. Never pad the list. Mix a few focus blocks (20 to 45 min) with lots of tiny tasks (2 to 15 min), such as reviewing 5 flashcards, printing notes, or booking a room, when they directly support something I listed. Break every big task into steps so nothing is longer than 45 minutes.
+- Include small general tasks only if they come from the "other things to get done" I listed. Use group "General" for those.
 - Use "routines" for anything that repeats (daily habits, weekly chores).
 - FIXED COMMITMENTS: lectures, labs, clinic shifts, and classes go in as routines or tasks with "fixed": true, with "start" and "estimateMin" as the duration. Plan flexible study only around them, and never plan more than a realistic day.
 - For work measured in counts (question banks, flashcards, pages), set "target" and "unit", for example 40 and "questions".
@@ -238,7 +240,8 @@ function push(){if(!cloud)return;clearTimeout(pushT);pushT=setTimeout(async()=>{
   const snap=await cloud.get();if(snap.exists){const d=snap.data();if(d&&d.json){const R=JSON.parse(d.json);if((R.upd||0)>(S.upd||0)){S=R;try{localStorage.setItem("planner-v2",JSON.stringify(S))}catch(e){}render()}else push()}}else push()}catch(e){cloud=null;cloudMsg="Sync hit a problem. Your plan is still saved on this device."}})();
 let SAMPLE=null,HAS_AI=false;
 (async()=>{try{if(window.claude&&claude.use){SAMPLE=await claude.use("sample");HAS_AI=!!SAMPLE;if(HAS_AI&&(tab==="import"||tab==="today"))render()}}catch(e){}})();
-const aiPrompt=info=>prompt().replace(/My information[\s\S]*$/,"My information:\n"+info);
+const aiPrompt=info=>{let q=true;try{q=JSON.parse(localStorage.getItem("planner-form")||"{}").q!==false}catch(e){}
+  return prompt().replace(/My information[\s\S]*$/,"My information:\n"+info).replace("Reply with ONLY valid JSON, no markdown fences, no commentary, in exactly this shape",q?"If anything important is missing or unclear (exam dates, my weekly schedule, when I am free), first ask me up to 5 short questions and wait for my answers. Then reply with ONLY valid JSON, no markdown fences, no commentary, in exactly this shape":"Do not ask me questions. Leave out anything I did not tell you and list it in \"assumptions\". Reply with ONLY valid JSON, no markdown fences, no commentary, in exactly this shape")};
 function aiBoxHTML(){if(!HAS_AI)return"";return`<div class="pan"><h2 style="margin:0 0 6px">Build my plan with AI</h2><p class="small mute">Paste your syllabus, exam schedule, or timetable text. You can add a screenshot too. Mention your goals and when you’re free.</p><label for="aii">What should I plan around?</label><textarea id="aii" rows="6" placeholder="Anatomy lectures Mon–Fri 9–12. Biochem exam Nov 20. Free after 4pm. Also: laundry, gym 3 times a week…"></textarea><label for="aif">Screenshot (optional)</label><input id="aif" type="file" accept="image/*"><label for="aim">Apply as</label><select id="aim"><option value="replace">New plan (replace)</option><option value="update">Update (keep past and finished tasks)</option><option value="add">Add to my plan</option></select><button class="btn" id="aig">Build my plan</button><div id="aimsg" style="margin-top:10px"></div></div>`}
 function bindAI(){if(!HAS_AI||!$("#aig"))return;$("#aig").onclick=async()=>{const m=$("#aimsg"),info=$("#aii").value.trim(),f=$("#aif").files[0];
   if(!info&&!f){m.innerHTML=`<div class="err">Add some text or a screenshot first.</div>`;return}
@@ -291,6 +294,7 @@ async function gcPush(){
     if(h&&h.status!=="cancelled"&&h.summary===w.summary&&cut(h.start.dateTime||h.start.date)===cut(w.start.dateTime||w.start.date)&&cut(h.end.dateTime||h.end.date)===cut(w.end.dateTime||w.end.date)&&(h.description||"")===(w.description||""))return;
     jobs.push(async()=>{if(h){await put(id,w);u1++}else{try{await gapi(base,{method:"POST",body:JSON.stringify(w)});a1++}catch(e){if(e.status===409){await put(id,w);u1++}else throw e}}})});
   have.forEach((h,id)=>{if(h.status!=="cancelled"&&!want.has(id))jobs.push(async()=>{await gapi(base+"/"+id,{method:"DELETE"});d1++})});
+  if(jobs.length>15&&!confirm("This will change "+jobs.length+" events in your Planner calendar. Continue?"))return"Cancelled. Nothing was changed.";
   for(let i=0;i<jobs.length;i+=5)await Promise.all(jobs.slice(i,i+5).map(j=>j()));
   return`Pushed to your “Planner” calendar: ${a1} added, ${u1} changed, ${d1} removed.`}
 function gcHTML(){const id=GC.id();return`<div class="pan"><b>Google Calendar</b><p class="small mute" style="margin:4px 0 8px">Pull your lectures and shifts in as fixed commitments, and push your plan to a separate “Planner” calendar with reminders. You can also add a single task from its edit screen.</p><label for="gid">Google Client ID</label><input id="gid" value="${esc(id)}" placeholder="123456-abc.apps.googleusercontent.com" autocomplete="off"><div class="row"><button class="btn g s" id="gids">Save ID</button>${id?`<button class="btn" id="gsy">Sync both ways</button><button class="btn g s" id="gpl">Pull only</button><button class="btn g s" id="gps">Push only</button>`:""}</div><div id="gmsg" class="small" style="margin-top:8px;white-space:pre-wrap"></div><details style="margin-top:10px"><summary class="small" style="cursor:pointer;font-weight:600">How to get a Client ID (about 5 minutes, one time)</summary><ol class="small"><li>Go to console.cloud.google.com and create a project.</li><li>APIs &amp; Services, then Library: enable <b>Google Calendar API</b>.</li><li>OAuth consent screen: choose External, fill in an app name and your email, and add your own Google account under <b>Test users</b>.</li><li>Credentials, then Create credentials, then OAuth client ID: choose <b>Web application</b>.</li><li>Under Authorized JavaScript origins, add your Netlify address (like https://yourname.netlify.app) with no trailing slash.</li><li>Paste the Client ID above. Google will show an “unverified app” warning the first time. Choose Advanced, then continue.</li></ol></details></div>`}
@@ -438,35 +442,67 @@ function edit(id){
   <label for="f_mat">Materials (one per line)</label><textarea id="f_mat" rows="2">${esc(t.materials.join("\n"))}</textarea>
   <label for="f_if">If this gets in the way…</label><input id="f_if" value="${esc(t.ifThen.if)}"><label for="f_then">…then I will</label><input id="f_then" value="${esc(t.ifThen.then)}">
   <label for="f_notes">Notes</label><textarea id="f_notes" rows="2">${esc(t.notes)}</textarea></details>
-  <div class="row"><button class="btn" id="sv">Save</button>${!n&&t.date&&t.start&&!t.src?gcLink(t):""}${n?"":`<button class="btn d" id="dl">Delete</button>`}</div></div>`);
+  <div class="row"><button class="btn" id="sv">Save</button>${!n&&t.date&&t.start&&!t.src?gcLink(t):""}${!n&&S.tasks.filter(x=>x.title===t.title&&x.group===t.group).length>1?`<button class="btn d" id="dla">Delete all ${S.tasks.filter(x=>x.title===t.title&&x.group===t.group).length} like this</button>`:""}${n?"":`<button class="btn d" id="dl">Delete</button>`}</div></div>`);
   $("#c").onclick=close;
   $("#sv").onclick=()=>{["title","group","doneWhen","firstStep","date","start","location","notes"].forEach(k=>t[k]=$("#f_"+k).value.trim());t.target=parseInt($("#f_target").value)||0;t.unit=$("#f_unit").value.trim();t.fixed=$("#f_fixed").checked;
     t.estimateMin=parseInt($("#f_estimateMin").value)||0;t.materials=$("#f_mat").value.split("\n").map(s=>s.trim()).filter(Boolean);
     t.ifThen={if:$("#f_if").value.trim(),then:$("#f_then").value.trim()};if(!t.title)t.title="Untitled task";
     if(n)S.tasks.push(t);if(t.date)sel=t.date;save();close()};
   const d=$("#dl");if(d)d.onclick=()=>{S.tasks=S.tasks.filter(x=>x!==t);save();close()};
+  const da=$("#dla");if(da)da.onclick=()=>{const c=S.tasks.filter(x=>x.title===t.title&&x.group===t.group).length;if(confirm("Delete all "+c+" tasks named “"+t.title+"”?")){S.tasks=S.tasks.filter(x=>!(x.title===t.title&&x.group===t.group));save();close()}};
 }
 function copy(text,el){const o=el.textContent;const ok=()=>{el.textContent="Copied";setTimeout(()=>el.textContent=o,1600)};
   try{navigator.clipboard.writeText(text).then(ok,()=>{el.textContent="Select the text and copy";setTimeout(()=>el.textContent=o,2200)})}catch(e){el.textContent="Select the text and copy"}}
-function load(text,mode){
-  let j;if(!/^\s*(\[|\{|```)/.test(text)&&text.indexOf("{")>=0&&text.lastIndexOf("}")>text.indexOf("{"))text=text.slice(text.indexOf("{"),text.lastIndexOf("}")+1);try{j=JSON.parse(text.trim().replace(/^```(?:json)?/i,"").replace(/```$/,"").trim())}catch(e){return{err:"That isn’t valid JSON. "+e.message+"\nAsk the AI to reply with only the JSON."}}
+function parse(text){
+  let j;if(!/^\s*(\[|\{|```)/.test(text)&&text.indexOf("{")>=0&&text.lastIndexOf("}")>text.indexOf("{"))text=text.slice(text.indexOf("{"),text.lastIndexOf("}")+1);
+  try{j=JSON.parse(text.trim().replace(/^```(?:json)?/i,"").replace(/```$/,"").trim())}catch(e){return{err:"That isn’t valid JSON. "+e.message+"\nIf the AI asked you questions, answer them first, then copy its final JSON reply."}}
   if(Array.isArray(j))j={tasks:j};
-  const tasks=(Array.isArray(j.tasks)?j.tasks:[]).map(norm);
-  let n=0;(Array.isArray(j.routines)?j.routines:[]).forEach(r=>{
-    const days=(r.days||[]).map(x=>typeof x==="number"?x:DN[String(x).slice(0,3).toLowerCase()]).filter(x=>x!=null);
-    const from=r.from||TODAY,to=r.to||add(from,28);
-    for(let d=from,c=0;d<=to&&c<400;d=add(d,1),c++)if(days.includes(D(d).getDay())){tasks.push(norm({title:r.title,start:r.start,estimateMin:r.estimateMin,group:r.group,fixed:r.fixed,date:d},tasks.length));n++}});
-  const ms=(Array.isArray(j.milestones)?j.milestones:[]).filter(m=>m&&/^\d{4}-\d{2}-\d{2}$/.test(m.date||"")).map(m=>({title:String(m.title||"Milestone"),date:m.date,type:m.type||""}));
+  const tasks=(Array.isArray(j.tasks)?j.tasks:[]).map((t,i)=>{const x=norm(t,i);x._b=t.basis||"";return x}),rts=[];
+  (Array.isArray(j.routines)?j.routines:[]).forEach((r,ri)=>{
+    const days=(r.days||[]).map(x=>typeof x==="number"?x:DN[String(x).slice(0,3).toLowerCase()]).filter(x=>x!=null),from=r.from||TODAY,to=r.to||add(from,28),rid="r"+Date.now().toString(36)+ri;let c=0;
+    for(let d=from,k=0;d<=to&&k<400;d=add(d,1),k++)if(days.includes(D(d).getDay())){const x=norm({title:r.title,start:r.start,estimateMin:r.estimateMin,group:r.group,fixed:r.fixed,date:d},tasks.length);x.rid=rid;x._b=r.basis||"";tasks.push(x);c++}
+    rts.push({rid,title:String(r.title||"Repeating task"),days,start:r.start||"",count:c,fixed:!!r.fixed,basis:r.basis||""})});
+  const ms=(Array.isArray(j.milestones)?j.milestones:[]).filter(m=>m&&/^\d{4}-\d{2}-\d{2}$/.test(m.date||"")).map(m=>({title:String(m.title||"Milestone"),date:m.date,type:m.type||"",_b:m.basis||""}));
   const wk=(Array.isArray(j.weeks)?j.weeks:[]).filter(w=>w&&/^\d{4}-\d{2}-\d{2}/.test(w.start||"")).map(w=>({start:mon(w.start.slice(0,10)),focus:String(w.focus||"")}));
   if(!tasks.length&&!ms.length&&!wk.length)return{err:"Nothing to import. The JSON needs “tasks”, “milestones”, or “weeks”."};
-  if(mode==="replace")S=Object.assign(S,{title:j.title||"My plan",milestones:ms,weeks:wk,tasks});
+  return{j,tasks,ms,wk,rts}
+}
+function commit(p,mode){
+  const n=p.tasks.filter(t=>t.rid).length;p.tasks.forEach(t=>{delete t._b;delete t.rid});
+  const tasks=p.tasks,ms=p.ms.map(m=>({title:m.title,date:m.date,type:m.type})),wk=p.wk;
+  if(mode==="replace")S=Object.assign(S,{title:p.j.title||"My plan",milestones:ms,weeks:wk,tasks});
   else if(mode==="update"){const keep=S.tasks.filter(t=>(t.date&&t.date<TODAY)||t.done);S.milestones=ms.length?ms:S.milestones;S.weeks=wk.length?wk:S.weeks;S.tasks=keep.concat(tasks.filter(t=>!t.done))}
   else{S.tasks=S.tasks.concat(tasks);S.milestones=S.milestones.concat(ms);S.weeks=S.weeks.concat(wk)}
-  save();const a=Array.isArray(j.assumptions)&&j.assumptions.length?"\nThe AI assumed: "+j.assumptions.join("; "):"";
+  save();const a=Array.isArray(p.j.assumptions)&&p.j.assumptions.length?"\nThe AI assumed: "+p.j.assumptions.join("; "):"";
   return{ok:`Imported ${tasks.length} tasks${n?` (${n} from routines)`:""}, ${ms.length} milestones, ${wk.length} weekly focuses.${a}`}
 }
+function load(text,mode){const p=parse(text);return p.err?p:commit(p,mode)}
+function review(p,mode){
+  const sug=b=>b==="suggested",NM=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+  const idea=`<span class="ms-tag" style="background:var(--line);color:var(--ink)">AI idea</span>`;
+  const rv=(a,i,on,html,tag)=>`<label class="rv"><input type="checkbox" ${a}="${i}" ${on?"checked":""}><span>${html} ${tag||""}</span></label>`;
+  let h=`<div class="row sp"><h2 style="margin:0">Check before adding</h2><button class="btn g s" id="rc">Cancel</button></div><p class="small mute" style="margin:8px 0">Uncheck anything you don’t actually do. Only checked items are added. Things the AI marked as its own idea start unchecked.</p><div class="row"><button class="btn g s" id="ra">Select all</button><button class="btn g s" id="rn">Select none</button></div>`;
+  const as=Array.isArray(p.j.assumptions)?p.j.assumptions:[];
+  if(as.length)h+=`<div class="warn" style="display:block;margin-top:12px"><b>The AI assumed:</b><br>${as.map(esc).join("<br>")}</div>`;
+  if(p.ms.length)h+=`<h3 style="margin-top:16px">Exams and deadlines</h3>`+p.ms.map((m,i)=>rv("data-m",i,!sug(m._b),`<b>${esc(m.title)}</b> <span class="mute small">${fmt(m.date,{month:"short",day:"numeric",year:"numeric"})}</span>`,sug(m._b)?idea:"")).join("");
+  const fs=p.tasks.map((t,i)=>[t,i]).filter(([t])=>t.fixed&&!t.rid);
+  if(p.rts.length||fs.length)h+=`<h3 style="margin-top:16px">Fixed commitments and repeating blocks</h3>`+p.rts.map(r=>rv("data-r",r.rid,!sug(r.basis),`<b>${esc(r.title)}</b> <span class="mute small">${r.days.map(d=>NM[d]).join(", ")} · ${r.start||"any time"} · ${r.count} times${r.fixed?" · fixed":""}</span>`,sug(r.basis)?idea:"")).join("")+fs.map(([t,i])=>rv("data-t",i,!sug(t._b),`<b>${esc(t.title)}</b> <span class="mute small">${t.date?fmt(t.date,{month:"short",day:"numeric"}):""} ${t.start}</span>`,sug(t._b)?idea:"")).join("");
+  const day={};p.tasks.forEach((t,i)=>{if(t.rid||t.fixed)return;(day[t.date||""]=day[t.date||""]||[]).push([t,i])});
+  const ks=Object.keys(day).sort();
+  if(ks.length)h+=`<h3 style="margin-top:16px">Tasks (${ks.reduce((a,k)=>a+day[k].length,0)})</h3>`+ks.map(k=>{const L=day[k];return`<details style="border-top:1px solid var(--line)"><summary style="cursor:pointer;display:flex;gap:10px;align-items:center;padding:8px 0"><input type="checkbox" data-day="1" ${L.some(([t])=>!sug(t._b))?"checked":""} style="width:20px;height:20px;margin:0;flex:none"><b>${k?fmt(k,{weekday:"short",month:"short",day:"numeric"}):"Anytime"}</b><span class="mute small">${L.length} task${L.length>1?"s":""} · ${dur(L.reduce((a,[t])=>a+t.estimateMin,0))}</span></summary><div style="padding-left:30px">${L.map(([t,i])=>rv("data-t",i,!sug(t._b),`${esc(t.title)} <span class="mute small">${t.start} ${t.estimateMin?t.estimateMin+"m":""}</span>`,sug(t._b)?idea:"")).join("")}</div></details>`}).join("");
+  if(p.wk.length)h+=`<p class="small mute" style="margin-top:14px">${p.wk.length} weekly focus lines will also be added.</p>`;
+  open(h+`<button class="btn" id="rok" style="width:100%;padding:14px;margin-top:14px">Add selected</button><div id="rmsg" class="err" style="margin-top:8px"></div>`);
+  const all=()=>document.querySelectorAll("#ob input[type=checkbox]");
+  $("#rc").onclick=close;$("#ra").onclick=()=>all().forEach(x=>x.checked=true);$("#rn").onclick=()=>all().forEach(x=>x.checked=false);
+  document.querySelectorAll("#ob [data-day]").forEach(x=>x.onchange=()=>x.closest("details").querySelectorAll("input[data-t]").forEach(y=>y.checked=x.checked));
+  const ck=a=>new Set([...document.querySelectorAll("#ob input["+a+"]")].filter(x=>x.checked).map(x=>x.getAttribute(a)));
+  $("#rok").onclick=()=>{const kt=ck("data-t"),kr=ck("data-r"),km=ck("data-m");
+    p.tasks=p.tasks.filter((t,i)=>t.rid?kr.has(t.rid):kt.has(String(i)));p.ms=p.ms.filter((m,i)=>km.has(String(i)));
+    if(!p.tasks.length&&!p.ms.length){$("#rmsg").textContent="Nothing is checked. Check at least one item, or cancel.";return}
+    commit(p,mode);sel=TODAY;tab="today";$("#ov").classList.add("hidden");render();scrollTo(0,0)};
+}
 function formGet(){try{return JSON.parse(localStorage.getItem("planner-form")||"{}")}catch(e){return{}}}
-function formInfo(){const f=formGet(),v=k=>(f[k]||"").trim()||"(none)";return`- Goals and deadlines: ${v("g")}\n- How far ahead to plan: ${v("h")}\n- Fixed commitments (lectures, labs, shifts, with days and times): ${v("x")}\n- When I am free to study: ${v("fr")}\n- Other things I need to get done (errands, chores, habits): ${v("o")}`}
+function formInfo(){const f=formGet(),v=k=>(f[k]||"").trim()||"(none)";return`- Goals and deadlines: ${v("g")}\n- How far ahead to plan: ${v("h")}\n- Fixed commitments (lectures, labs, shifts, with days and times): ${v("x")}\n- When I am free to study: ${v("fr")}\n- Other things I need to get done (errands, chores, habits): ${v("o")}\n- Most hours I can work in a day, lectures included: ${st().cap}`}
 function vImport(){
   const f=formGet(),h=f.h||"2 months",has=S.tasks.length>0;
   const fld=(k,l,ph,rows)=>`<label for="fm_${k}">${l}</label>${rows?`<textarea id="fm_${k}" rows="${rows}" placeholder="${esc(ph)}">${esc(f[k]||"")}</textarea>`:`<input id="fm_${k}" value="${esc(f[k]||"")}" placeholder="${esc(ph)}">`}`;
@@ -478,9 +514,9 @@ function vImport(){
    ${fld("fr","When are you free to study?","Weekdays after 4pm, Saturday mornings")}
    ${fld("o","Other things to get done (optional)","Laundry on Sundays, gym 3 times a week, email the registrar",2)}</div>
   <div class="pan"><b style="font-size:1.1rem">2. Send it to an AI</b><p class="small mute" style="margin:2px 0 10px">This copies one message that already has everything the AI needs.</p>
-   <button class="btn" id="cp" style="width:100%;padding:14px">Copy my message</button><div id="cpm" class="small" style="margin:8px 0"></div>
+   <label style="display:flex;gap:10px;align-items:flex-start;margin-bottom:10px"><input type="checkbox" id="fm_q" ${f.q===false?"":"checked"} style="width:20px;height:20px;margin:2px 0 0;flex:none"><span>Let the AI ask me a few questions first. This avoids guesses and makes the plan more accurate.</span></label><button class="btn" id="cp" style="width:100%;padding:14px">Copy my message</button><div id="cpm" class="small" style="margin:8px 0"></div>
    <div class="row"><a class="btn g s" href="https://claude.ai/new" target="_blank" rel="noopener" style="text-decoration:none">Open Claude</a><a class="btn g s" href="https://chatgpt.com/" target="_blank" rel="noopener" style="text-decoration:none">Open ChatGPT</a></div>
-   <p class="small mute" style="margin:10px 0 0">Paste the message there and send it. When the AI answers, copy its whole reply.</p>
+   <p class="small mute" style="margin:10px 0 0">Paste the message there and send it. If it asks questions, answer them. Then copy its final reply (the JSON).</p>
    <details style="margin-top:8px"><summary class="small" style="cursor:pointer;font-weight:600">See the message</summary><textarea class="code" id="pr" rows="8" readonly></textarea></details></div>
   <div class="pan"><b style="font-size:1.1rem">3. Paste the reply here</b><textarea class="code" id="pt" rows="5" placeholder="Paste the AI’s reply here…" style="margin-top:8px"></textarea>
    <div class="row" style="margin-bottom:10px"><button class="btn g s" id="pc">Paste from clipboard</button></div>
@@ -490,8 +526,8 @@ function vImport(){
   ${has?`<h2>Keep it up to date</h2><p class="small mute">Once a week, copy this message to an AI. It fills in detailed tasks for the next two weeks.</p><button class="btn g" id="c2">Copy “detail the next 2 weeks” message</button><div id="c2m" class="small" style="margin-top:6px"></div>`:""}
   <h2>More</h2><div class="row"><button class="btn g s" id="ex">Try an example</button><button class="btn g s" id="cx">Copy plan backup</button><button class="btn d s" id="cl">Clear everything</button></div><div id="cxm" class="small" style="margin-top:6px"></div><textarea class="code" id="xp" rows="3" readonly style="margin-top:10px"></textarea>`;
   bindAI();
-  const read=()=>{const o={g:$("#fm_g").value,h:$("#fm_h").value,x:$("#fm_x").value,fr:$("#fm_fr").value,o:$("#fm_o").value};try{localStorage.setItem("planner-form",JSON.stringify(o))}catch(e){}return o};
-  ["g","h","x","fr","o"].forEach(k=>$("#fm_"+k).addEventListener("change",()=>{read();$("#pr").value=aiPrompt(formInfo())}));
+  const read=()=>{const o={g:$("#fm_g").value,h:$("#fm_h").value,x:$("#fm_x").value,fr:$("#fm_fr").value,o:$("#fm_o").value,q:$("#fm_q").checked};try{localStorage.setItem("planner-form",JSON.stringify(o))}catch(e){}return o};
+  ["g","h","x","fr","o","q"].forEach(k=>$("#fm_"+k).addEventListener("change",()=>{read();$("#pr").value=aiPrompt(formInfo())}));
   $("#pr").value=aiPrompt(formInfo());
   const cp=async(text,msg,okText)=>{let ok=false;try{await navigator.clipboard.writeText(text);ok=true}catch(e){}
     if(!ok){try{const t=$("#pr");t.value=text;t.closest("details").open=true;t.select();ok=document.execCommand("copy")}catch(e){}}
@@ -501,7 +537,7 @@ function vImport(){
   $("#xp").value=JSON.stringify({title:S.title,milestones:S.milestones,weeks:S.weeks,tasks:S.tasks});
   $("#cx").onclick=()=>{$("#pr").value;cp($("#xp").value,$("#cxm"),"Backup copied. Paste it somewhere safe.")};
   $("#pc").onclick=async()=>{try{const t=await navigator.clipboard.readText();if(!t.trim())throw 0;$("#pt").value=t;$("#msg").innerHTML=`<span class="okmsg">Pasted. Now tap Build my planner.</span>`}catch(e){$("#msg").innerHTML=`<span class="err">Couldn’t read the clipboard. Tap and hold in the box above and choose Paste.</span>`}};
-  const run=txt=>{if(!txt.trim()){$("#msg").innerHTML=`<span class="err">Paste the AI’s reply first.</span>`;return}const r=load(txt,$("#md").value);$("#msg").innerHTML=r.err?`<div class="err">${esc(r.err)}</div>`:`<div class="okmsg" style="white-space:pre-wrap">${esc(r.ok)}</div>`;if(r.ok){sel=TODAY;setTimeout(()=>{tab="today";render()},r.ok.includes("assumed")?3500:900)}};
+  const run=txt=>{if(!txt.trim()){$("#msg").innerHTML=`<span class="err">Paste the AI’s reply first.</span>`;return}const p=parse(txt);if(p.err){$("#msg").innerHTML=`<div class="err">${esc(p.err)}</div>`;return}$("#msg").innerHTML="";review(p,$("#md").value)};
   $("#im").onclick=()=>run($("#pt").value);
   $("#fl").onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>run(String(r.result));r.readAsText(f)};
   $("#ex").onclick=()=>{const m=add(TODAY,35);run(JSON.stringify({title:"Biology midterm",assumptions:["Free weekdays 4–6pm"],
